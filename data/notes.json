@@ -1,0 +1,59 @@
+[
+  {
+    "id": "note-1793986254025-e07f27",
+    "name": "Anonymous",
+    "message": "I never seen this kind of portfolio before ,  what a creativity",
+    "color": "yellow",
+    "createdAt": "2026-11-06T17:30:54.025Z",
+    "moderationStatus": "approved"
+  },
+  {
+    "id": "note-1793985109526-1265ac",
+    "name": "Tester",
+    "message": "Hello Ravi! Testing the public sticky note wall.",
+    "color": "mint",
+    "createdAt": "2026-11-06T17:11:49.529Z",
+    "moderationStatus": "approved"
+  },
+  {
+    "id": "note-seed-1",
+    "name": "Aarav (SIH Team)",
+    "message": "Loved building UrbanPlus.AI with you! Winning 1st place at FutureHacks was unforgettable. Keep coding, Ravi!",
+    "color": "yellow",
+    "createdAt": "2026-11-04T14:20:00.000Z",
+    "moderationStatus": "approved",
+    "pinned": true
+  },
+  {
+    "id": "note-seed-2",
+    "name": "Priya Sharma",
+    "message": "The interactive particle hologram on this portfolio is unbelievable! Truly feels like a futuristic OS. 🌟",
+    "color": "pink",
+    "createdAt": "2026-11-05T09:15:00.000Z",
+    "moderationStatus": "approved"
+  },
+  {
+    "id": "note-seed-3",
+    "name": "Karan M. (RR Weddings)",
+    "message": "Thanks for delivering our wedding filmers platform with such speed and polish. The couple stories look stunning!",
+    "color": "mint",
+    "createdAt": "2026-11-05T18:40:00.000Z",
+    "moderationStatus": "approved"
+  },
+  {
+    "id": "note-seed-4",
+    "name": "Dev Collaborator",
+    "message": "Saw your Drishti AI and RAG projects on GitHub — very clean architecture and solid documentation. Cheers!",
+    "color": "blue",
+    "createdAt": "2026-11-06T11:30:00.000Z",
+    "moderationStatus": "approved"
+  },
+  {
+    "id": "note-seed-5",
+    "name": "Anonymous",
+    "message": "Found your portfolio from LinkedIn. The macOS desktop vibe + Three.js wallpapers is pure art. Inspiring work!",
+    "color": "lavender",
+    "createdAt": "2026-11-06T16:05:00.000Z",
+    "moderationStatus": "approved"
+  }
+]
