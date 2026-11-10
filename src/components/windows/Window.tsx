@@ -8,14 +8,21 @@ import type { Breakpoint } from '../../hooks/useBreakpoint'
 export function Window({ id, bp }: { id: AppId; bp: Breakpoint }) {
   const w = useDesktop((s) => s.windows[id])
   const active = useDesktop((s) => s.activeId === id)
-  const { close, minimize, toggleMax, focus, move, resize } = useDesktop.getState()
+  const close = useDesktop((s) => s.close)
+  const minimize = useDesktop((s) => s.minimize)
+  const toggleMax = useDesktop((s) => s.toggleMax)
+  const focus = useDesktop((s) => s.focus)
+  const move = useDesktop((s) => s.move)
+  const resize = useDesktop((s) => s.resize)
+
   const { title, Component } = APPS[id]
   const mobile = bp === 'mobile'
   const max = w.maximized || mobile
 
   const onDown = (e: RPE<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return
     focus(id)
-    if (max || (e.target as HTMLElement).closest('button')) return
+    if (max) return
     const dx = e.clientX - w.x
     const dy = e.clientY - w.y
 
@@ -90,8 +97,12 @@ export function Window({ id, bp }: { id: AppId; bp: Breakpoint }) {
         aria-label={title}
       >
         {mobile && (
-          <div className="flex justify-center pt-2 pb-0.5">
-            <span className="h-1 w-10 rounded-full bg-white/25" />
+          <div
+            className="flex justify-center pt-2 pb-0.5 cursor-pointer"
+            onClick={() => close(id)}
+            title="Tap to close"
+          >
+            <span className="h-1 w-10 rounded-full bg-white/25 hover:bg-white/40 transition-colors" />
           </div>
         )}
 
@@ -100,27 +111,50 @@ export function Window({ id, bp }: { id: AppId; bp: Breakpoint }) {
           onPointerDown={onDown}
           onDoubleClick={() => !mobile && toggleMax(id)}
         >
-          <div className="flex gap-2">
+          <div
+            className="relative z-20 flex items-center gap-2"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
             <button
+              type="button"
               aria-label="Close"
-              onClick={() => close(id)}
-              className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ff5f57] text-black/70 transition-transform hover:scale-110 active:scale-95"
+              onClick={(e) => {
+                e.stopPropagation()
+                close(id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="group/btn relative flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#ff5f57] text-black/70 transition-transform hover:scale-110 active:scale-95 cursor-pointer touch-manipulation"
             >
-              <X size={9} strokeWidth={3} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+              <X size={9} strokeWidth={3} className="opacity-0 group-hover:opacity-100 group-hover/btn:opacity-100 transition-opacity pointer-events-none" />
+              <span className="absolute -inset-2 block sm:hidden" />
             </button>
             <button
+              type="button"
               aria-label="Minimize"
-              onClick={() => minimize(id)}
-              className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#febc2e] text-black/70 transition-transform hover:scale-110 active:scale-95"
+              onClick={(e) => {
+                e.stopPropagation()
+                minimize(id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="group/btn relative flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#febc2e] text-black/70 transition-transform hover:scale-110 active:scale-95 cursor-pointer touch-manipulation"
             >
-              <Minus size={9} strokeWidth={3} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Minus size={9} strokeWidth={3} className="opacity-0 group-hover:opacity-100 group-hover/btn:opacity-100 transition-opacity pointer-events-none" />
+              <span className="absolute -inset-2 block sm:hidden" />
             </button>
             <button
+              type="button"
               aria-label="Maximize or restore"
-              onClick={() => !mobile && toggleMax(id)}
-              className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#28c840] text-black/70 transition-transform hover:scale-110 active:scale-95"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!mobile) toggleMax(id)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="group/btn relative flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#28c840] text-black/70 transition-transform hover:scale-110 active:scale-95 cursor-pointer touch-manipulation"
             >
-              <Plus size={9} strokeWidth={3} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Plus size={9} strokeWidth={3} className="opacity-0 group-hover:opacity-100 group-hover/btn:opacity-100 transition-opacity pointer-events-none" />
+              <span className="absolute -inset-2 block sm:hidden" />
             </button>
           </div>
           <span className="pointer-events-none absolute inset-x-0 text-center text-[13px] font-medium tracking-wide text-white/80">

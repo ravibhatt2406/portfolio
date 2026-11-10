@@ -13,19 +13,17 @@ RAVI.OS is Ravi Bhatt's interactive personal operating system and portfolio:
   - **Wallpaper 3: Blue Particle Intelligence** — Luminous electric-blue botanical branching tree (flared roots, trunk, 5 major boughs, canopy) morphing into a 3D rotating geometric cyber cube with glowing 3D "AI" letters inside.
   - **macOS Wallpaper Switcher**: Native macOS glass modal with 3 preview cards in exact order (1. Cosmic Planet, 2. Ravi Hologram, 3. Blue Particle Intelligence), active indicators, and instant switching with localStorage persistence.
   - Full desktop suite: Top menu bar with Wallpaper button, floating profile sidebar with a live 3D mini hologram avatar, floating magnifying dock, and multi-window manager hosting nine apps.
-- **Status**: Phase 18 Complete — Updated Resume, Experience Alignment (Open Source Contributor replacing InternPe), Skills & Projects Sync.
-  - **Updated Resume PDF**: Sourced and verified Ravi's updated PDF resume (`media_1794236279389_c2bd9a17.pdf`, 78.1 KB), copied to `public/resume.pdf` and bundled into `dist/resume.pdf`. Embedded in `ResumeApp.tsx` with high-fidelity preview, "Download Resume", and "Open in New Tab" actions.
-  - **Experience Alignment**:
-    - Removed `InternPe`.
-    - Added `Open Source Contributor` (Role: `Open Source Contributor`, Type: `Open Source`, Org: `FLN Project & Open Source Community`, Period: `Aug 2026 – Present`) with emerald styling and `GitBranch` icon.
-    - Updated `Vicharanashala Lab, IIT Ropar` timeline to `Sep 2026 – Nov 2026` and detailed its contributions (open-source FLN project, ICRISAT dataset EDA & predictive modeling with Linear Regression, Decision Tree, Random Forest, and K-Means clustering).
-    - Updated `Titan Auto` to `Freelance Project Developer` with customer analytics, sales reporting, and AI chatbot integration.
-    - Synced experience highlight card in `AboutApp.tsx` to reflect `Sep 2026 – Nov 2026` and `Open Source Contributor`.
-  - **Skills & Projects Sync**:
-    - `skills.ts`: Added `XGBoost`, `SHAP`, `AI Agents`, `C`, `MongoDB`, `Express.js`, `Docker`, and `Feature Engineering` / `Model Evaluation`. Grouped with `Generative & Agentic AI` and `Tools & Visualization`.
-    - `projects.ts`: Synchronized `RAG-Based AI Teaching Assistant` and added `Customer Churn Prediction with Explainable ML` with SHAP interpretability.
-    - `achievements.ts`: Added `DeepLearning.AI Machine Learning Specialization`.
-  - **Zero Regressions**: 3D Wallpapers (Cosmic Planet, Ravi Hologram, Blue Particle Tree), Sticky Notes Wall, Games App (Snake), and profile photo intact. Production build passes cleanly (`npm run build` in 1.34s).
+- **Status**: Phase 19 Complete — Production Deployment Debugging, UI Consistency & Window Controls Fix.
+  - **Window Controls (Close & Minimize) Robustness**:
+    - Identified root cause: `onPointerDown` on the draggable window header was intercepting clicks before `onClick` could fire, `(e.target).closest('button')` failed on SVG child elements, and `focus(id)` triggered a mid-pointerdown re-render that caused mobile browsers to discard synthetic click events.
+    - Fixed in `src/components/windows/Window.tsx`: added explicit `onPointerDown={(e) => e.stopPropagation()}` on the traffic light button container and individual buttons, added `pointer-events-none` on SVG icons, added invisible touch hit-target expanders (`-inset-2`) for touchscreens, used stable reactive Zustand hook selectors (`useDesktop((s) => s.close)`), and added pull-down bar closing on mobile.
+  - **Production Deployment & Serverless API (`vercel.json` & `api/notes.ts`)**:
+    - Created `vercel.json` with SPA routing rewrites to `/index.html`, `/api/notes` routing, long-term immutable caching for `/assets/`, and proper `application/pdf` MIME headers for `/resume.pdf`.
+    - Created Vercel Serverless Function `api/notes.ts` to power `/api/notes` (GET and POST) in production.
+    - Updated `src/services/notesService.ts` with `SEED_NOTES` fallback and optimistic local caching, ensuring the noticeboard and counter are always fully populated even on offline or first-time loads.
+  - **Tailwind & CSS Consistency**:
+    - Placed `-webkit-backdrop-filter` before `backdrop-filter` in `.glass` and `.glass-bar` for cross-browser blur compatibility on iOS Safari and WebKit.
+  - **Zero Regressions**: 3D Wallpapers (Cosmic Planet, Ravi Hologram, Blue Particle Tree), Sticky Notes Wall, Games App (Snake), and profile photo intact. Production build passes cleanly (`npm run build` in 1.39s).
 
 ---
 
