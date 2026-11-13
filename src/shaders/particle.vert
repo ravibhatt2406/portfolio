@@ -6,12 +6,20 @@ uniform float uSize;
 uniform float uPixelRatio;
 uniform vec2  uMouse;      // world-space xy at hologram plane
 uniform float uRepel;
+uniform float uScanY;      // Sweeping scan beam Y position
+uniform float uScanGlow;   // Intensity of scan beam (0..1)
+uniform float uPulse;      // Soft periodic breathing energy pulse (0..1)
+
 attribute vec3 aStart;
 attribute vec4 aRand;      // x random, y size, z category/type, w luminance/contrast
+attribute vec3 aNormal;    // Surface normal for volumetric orientation
+
 varying float vLum;
 varying float vDepth;
 varying float vType;
 varying float vAlpha;
+varying float vScan;
+varying float vPulse;
 
 void main() {
   // Smooth non-linear assembly with per-particle jitter
@@ -24,28 +32,33 @@ void main() {
   float c = cos(sw), s = sin(sw);
   pos.xz = mat2(c, -s, s, c) * pos.xz;
 
-  // Organic, spatially coherent idle breathing motion (preserves anatomical facial landmarks)
+  // Lifelike organic breathing & subtle harmonic sway
   float t = uTime * uMotion;
-  // Continuous wave across the bust so neighboring particles move together
-  vec3 sway = vec3(
-    sin(t * 0.55 + pos.y * 0.75) * 0.006,
-    cos(t * 0.45 + pos.x * 0.65) * 0.004,
-    sin(t * 0.65 + pos.y * 1.1) * 0.010
+  float breathe = sin(t * 1.6) * 0.006;
+  vec3 breatheVec = vec3(
+    pos.x * breathe + sin(t * 0.55 + pos.y * 0.75) * 0.005,
+    pos.y * breathe * 0.7 + cos(t * 0.45 + pos.x * 0.65) * 0.004,
+    pos.z * breathe + sin(t * 0.65 + pos.y * 1.10) * 0.008
   );
-  // Microscopic stardust drift (microscopic, never distorts eyes/nose/mouth/beard)
+
+  // Microscopic stardust drift (microscopic, never distorts facial landmarks)
   vec3 micro = vec3(
     sin(t * 1.2 + aRand.x * 6.283),
-    cos(t * 1.1 + aRand.x * 4.1),
-    sin(t * 1.3 + aRand.x * 5.3)
-  ) * 0.0012;
+    cos(t * 1.1 + aRand.x * 4.100),
+    sin(t * 1.3 + aRand.x * 5.300)
+  ) * 0.0010;
 
-  pos += (sway + micro) * p + vec3(sin(t + aRand.x * 6.28), cos(t + aRand.x * 4.0), 0.0) * (0.04 * (1.0 - p));
+  pos += (breatheVec + micro) * p + vec3(sin(t + aRand.x * 6.28), cos(t + aRand.x * 4.0), 0.0) * (0.04 * (1.0 - p));
 
   // Dispersion burst on transition
   vec3 dir = normalize(position + vec3(0.0001));
   pos += dir * uBurst * (0.7 + aRand.x * 2.5);
 
   vec4 wp = modelMatrix * vec4(pos, 1.0);
+
+  // Sweeping holographic scan line calculation in world space
+  float scanDist = abs(wp.y - uScanY);
+  float scanFactor = smoothstep(0.09, 0.0, scanDist) * uScanGlow;
 
   // Cursor repulsion (smooth radial falloff + elastic return)
   vec2 d = wp.xy - uMouse;
@@ -57,21 +70,31 @@ void main() {
   vec4 mv = viewMatrix * wp;
   gl_Position = projectionMatrix * mv;
 
-  // Depth normalization for volumetric coloring
-  float depthN = clamp((pos.z + 0.35) / 0.85, 0.0, 1.0);
+  // Volumetric view-direction facing factor (Three.js cameraPosition)
+  vec3 vNorm = normalize(mat3(modelMatrix) * aNormal);
+  vec3 viewDir = normalize(cameraPosition - wp.xyz);
+  float ndotv = dot(vNorm, viewDir);
+  float facing = clamp(ndotv * 0.70 + 0.50, 0.12, 1.0);
 
-  // High-definition point sizing: crisp fine points so facial features don't blur into solid blobs
+  // Depth normalization for volumetric coloring
+  float depthN = clamp((pos.z + 0.45) / 0.95, 0.0, 1.0);
+
+  // High-definition point sizing
   float sizeBase = (1.08 + aRand.y * 0.68) * (0.85 + depthN * 0.35);
-  // Refine point size for facial hair / pupils to keep them razor-sharp
-  if (aRand.z < 0.18) sizeBase *= 0.88;
-  // Slight boost for sparkling catchlights and nose bridge highlights
+  // Razor-sharp points for facial hair / pupils
+  if (aRand.z < 0.18) sizeBase *= 0.86;
+  // Sparkling catchlights and nose bridge highlights
   if (aRand.w > 0.80 && aRand.z > 0.68) sizeBase *= 1.18;
+  // Boost point size when swept by holographic scan beam
+  sizeBase *= (1.0 + scanFactor * 1.5);
 
   gl_PointSize = uSize * uPixelRatio * sizeBase * (4.2 / -mv.z);
 
   vLum = aRand.w;
   vDepth = depthN;
   vType = aRand.z;
-  // Alpha: base luminance + subtle shimmer + assembly blend
-  vAlpha = (0.55 + 0.45 * aRand.w) * (0.86 + 0.14 * sin(uTime * uMotion * 1.8 + aRand.x * 12.0)) * mix(0.3, 1.0, p);
+  vScan = scanFactor;
+  vPulse = uPulse;
+  // Alpha: base luminance + subtle shimmer + assembly blend + volumetric facing
+  vAlpha = (0.55 + 0.45 * aRand.w) * facing * (0.86 + 0.14 * sin(uTime * uMotion * 1.8 + aRand.x * 12.0)) * mix(0.3, 1.0, p);
 }
