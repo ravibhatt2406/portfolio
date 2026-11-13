@@ -5,7 +5,6 @@ import vert from '../../shaders/particle.vert?raw'
 import frag from '../../shaders/particle.frag?raw'
 import { buildParticles, type ParticleData } from './portraitSampler'
 import { AmbientParticles } from './AmbientParticles'
-import { EnergyRings } from './EnergyRings'
 import { useDesktop } from '../../store/desktopStore'
 
 interface Props {
@@ -170,7 +169,6 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
         />
       </points>
       <AmbientParticles mouse={mouse} mini={mini} />
-      {!mini && <EnergyRings />}
     </group>
   )
 }
