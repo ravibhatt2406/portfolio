@@ -63,16 +63,35 @@ void main() {
 
   vec4 wp = modelMatrix * vec4(pos, 1.0);
 
-  // Controlled micro-cursor interaction (Phase 21):
-  // Face core particles: zero or microscopic movement (<= 0.002 displacement)
-  // Hair tips / outer shoulders: subtle gentle deflection (<= 0.015 displacement)
-  // Completely eliminates tearing, holes, or explosive scattering
+  // Responsive cursor ripple & dispersal (Phase 22: Responsive Hologram Ripple & Flow)
+  // Nearby particles gently disperse and flow in an organic ripple wave, then smoothly recover
   vec2 d = wp.xy - uMouse;
   float dist = length(d);
-  float repelFactor = smoothstep(0.80, 0.0, dist) * uRepel;
-  float maxDisp = mix(0.015, 0.002, aProtect);
-  vec2 cursorDisp = normalize(d + vec2(0.0001)) * repelFactor * maxDisp;
-  wp.xy += cursorDisp;
+  float rippleR = 0.50; // Active interaction radius
+  float normDist = dist / rippleR;
+  float influence = smoothstep(1.0, 0.0, normDist) * uRepel;
+
+  if (influence > 0.001) {
+    vec2 pushDir = normalize(d + vec2(0.0001));
+    vec2 tangent = vec2(-pushDir.y, pushDir.x);
+
+    // 1. Organic radial dispersal: gentle push outward
+    float push = pow(influence, 1.3) * 0.065;
+
+    // 2. Harmonic ripple wave propagating outward from cursor
+    float wavePhase = dist * 24.0 - t * 8.0;
+    float ripple = sin(wavePhase) * 0.024 * influence;
+
+    // 3. Fluid vortex swirl / magnetic wake along flow lines
+    float swirl = sin(dist * 14.0 - t * 5.0) * 0.030 * influence;
+
+    // Apply smooth ripple displacement in world space
+    vec2 cursorDisp = pushDir * (push + ripple) + tangent * swirl;
+    wp.xy += cursorDisp;
+
+    // Volumetric Z-depth wave: particles lift slightly forward in a wave
+    wp.z += cos(wavePhase) * influence * 0.040;
+  }
 
   vec4 mv = viewMatrix * wp;
   gl_Position = projectionMatrix * mv;
@@ -84,14 +103,16 @@ void main() {
   float sizeBase = (1.08 + aRand.y * 0.68) * (0.85 + depthN * 0.35);
   // Refine point size for facial hair / pupils to keep them razor-sharp
   if (aRand.z < 0.18) sizeBase *= 0.88;
-  // Slight boost for sparkling catchlights and nose bridge highlights
+  // Boost point size & catchlight for particles caught in cursor ripple wave
+  sizeBase *= (1.0 + influence * 0.35);
   if (aRand.w > 0.80 && aRand.z > 0.68) sizeBase *= 1.18;
 
   gl_PointSize = uSize * uPixelRatio * sizeBase * (4.2 / -mv.z);
 
-  // Slight variations in particle brightness for flowing energy appearance
+  // Slight variations in particle brightness for flowing energy appearance + ripple catchlight
   float shimmer = 0.94 + 0.06 * sin(t * 2.0 + aRand.x * 6.28 + pos.y * 4.0);
-  vLum = aRand.w * shimmer;
+  shimmer = mix(shimmer, 1.45, influence * 0.75);
+  vLum = min(1.0, aRand.w * shimmer + influence * 0.28);
   vDepth = depthN;
   vType = aRand.z;
   // Alpha: base luminance + subtle shimmer + assembly blend

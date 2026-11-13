@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import vert from '../../shaders/ambient.vert?raw'
 import frag from '../../shaders/ambient.frag?raw'
@@ -145,6 +145,8 @@ export function AmbientParticles({ mouse, mini = false }: Props) {
     uRepel: { value: 1.0 },
   }), [])
 
+  const { viewport } = useThree()
+
   useFrame((s) => {
     if (!matRef.current) return
     const { phase, reducedMotion } = useDesktop.getState()
@@ -160,10 +162,13 @@ export function AmbientParticles({ mouse, mini = false }: Props) {
     const desk = phase === 'desktop' && !mini
     u.uDim.value = desk ? 0.90 : 1.0
 
-    // Cursor coordinates
+    // Exact world-space mouse coordinates at hologram plane
     const m = mouse.current
+    const worldMX = (m.x * viewport.width) / 2
+    const worldMY = (m.y * viewport.height) / 2
+
     if (m && m.active) {
-      u.uMouse.value.set(m.x * 2.2, m.y * 1.8)
+      u.uMouse.value.set(worldMX, worldMY)
       u.uRepel.value = 1.0
     } else {
       u.uMouse.value.set(999, 999)

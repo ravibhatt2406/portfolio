@@ -70,3 +70,4 @@ void main() {
   float shimmer = 0.60 + 0.40 * sin(t * 1.8 * aSeed.y + aSeed.x * 12.0);
   vAlpha = shimmer * uDim;
 }
+

@@ -5,6 +5,7 @@ import vert from '../../shaders/particle.vert?raw'
 import frag from '../../shaders/particle.frag?raw'
 import { buildParticles, type ParticleData } from './portraitSampler'
 import { AmbientParticles } from './AmbientParticles'
+import { EnergyRings } from './EnergyRings'
 import { useDesktop } from '../../store/desktopStore'
 
 interface Props {
@@ -28,7 +29,7 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
   const mat = useRef<THREE.ShaderMaterial>(null)
   const state = useRef({
     assemble: mini || (typeof window !== 'undefined' && useDesktop.getState().phase === 'desktop') ? 1 : 0,
-    burst: 0, rx: 0, ry: 0, vx: 0, vy: 0, px: 0, py: 0, sc: 1, mx: 0, my: 0, dim: 1
+    burst: 0, rx: 0, ry: 0, vx: 0, vy: 0, px: 0, py: 0, sc: 1, mx: 0, my: 0, dim: 1, repel: 0
   })
   const { viewport } = useThree()
 
@@ -136,14 +137,21 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     const showInt = typeof window !== 'undefined' ? window.__TOGGLE_HOLOGRAM_INTERNAL !== false : true
     mat.current.visible = showInt
 
-    // Cursor coordinates for internal particle micro-deflection
+    // Exact world-space mouse coordinates at hologram plane
+    const worldMX = (m.x * viewport.width) / 2
+    const worldMY = (m.y * viewport.height) / 2
+
+    // Smooth cursor ripple activation & natural spring recovery
     if (m && m.active) {
-      u.uMouse.value.set(m.x * 2.2, m.y * 1.8)
-      u.uRepel.value = 1.0
+      u.uMouse.value.set(worldMX, worldMY)
+      st.repel += (1.0 - st.repel) * Math.min(1, dt * 10)
     } else {
-      u.uMouse.value.set(999, 999)
-      u.uRepel.value = 0.0
+      st.repel += (0.0 - st.repel) * Math.min(1, dt * 6)
+      if (st.repel < 0.001) {
+        u.uMouse.value.set(999, 999)
+      }
     }
+    u.uRepel.value = st.repel
   })
 
   if (!data) return null
@@ -162,6 +170,7 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
         />
       </points>
       <AmbientParticles mouse={mouse} mini={mini} />
+      {!mini && <EnergyRings />}
     </group>
   )
 }
