@@ -12,11 +12,12 @@ interface Props {
   mini?: boolean
 }
 
-// Global inspectable angle override for verification (0, 25, 55, 90, 180 deg)
+// Global inspectable hook for 5-angle inspection & verification
 declare global {
   interface Window {
     __SET_HOLOGRAM_ANGLE?: (deg: number | null) => void
     __HOLOGRAM_LOCKED_ANGLE?: number | null
+    __GET_HOLOGRAM_STATS?: () => { count: number; scale: number } | null
   }
 }
 
@@ -43,15 +44,19 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
       window.__SET_HOLOGRAM_ANGLE = (deg: number | null) => {
         window.__HOLOGRAM_LOCKED_ANGLE = deg
       }
+      window.__GET_HOLOGRAM_STATS = () => {
+        if (!data || !group.current) return null
+        return { count: data.count, scale: group.current.scale.x }
+      }
     }
-  }, [])
+  }, [data])
 
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
     uAssemble: { value: mini ? 1 : 0 },
     uBurst: { value: 0 },
     uMotion: { value: 1 },
-    uSize: { value: mini ? 1.35 : 1.15 },
+    uSize: { value: mini ? 1.60 : 1.55 },
     uPixelRatio: { value: Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2) },
     uMouse: { value: new THREE.Vector2(99, 99) },
     uRepel: { value: mini ? 0 : 1 },
@@ -82,29 +87,31 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     st.burst += (burstTarget - st.burst) * Math.min(1, dt * (burstTarget ? 3.2 : 2.2))
     u.uBurst.value = reducedMotion ? 0 : st.burst
 
-    // Holographic vertical scan beam animation (Reference Board 1)
-    // Sweeps upwards periodically across chest, neck, face, and swept-up hair coif
-    const scanPeriod = 4.2
+    // Refined thin cyan holographic scan line: controlled gentle sweep, zero blowout
+    const scanPeriod = 5.2
     const scanT = (s.clock.elapsedTime % scanPeriod) / scanPeriod
     if (!mini && scanT < 0.65) {
       const normScan = scanT / 0.65
       u.uScanY.value = -0.85 + normScan * 1.70
       const edgeFade = Math.sin(normScan * Math.PI)
-      u.uScanGlow.value = reducedMotion ? 0 : edgeFade * 1.0
+      u.uScanGlow.value = reducedMotion ? 0 : edgeFade * 0.45
     } else {
       u.uScanGlow.value = 0
       u.uScanY.value = -2.0
     }
 
     // Periodic breathing energy pulse
-    const pulseCycle = (s.clock.elapsedTime * 1.6) % (Math.PI * 2)
-    u.uPulse.value = mini || reducedMotion ? 0 : Math.max(0, Math.sin(pulseCycle) * 0.75)
+    const pulseCycle = (s.clock.elapsedTime * 1.5) % (Math.PI * 2)
+    u.uPulse.value = mini || reducedMotion ? 0 : Math.max(0, Math.sin(pulseCycle) * 0.65)
 
-    // Layout per phase
+    // Layout per phase: Significantly enlarged hologram (75–85% of visual height)
+    // Desktop scale increased from 0.88 to 1.28 (+45% linear, +65% visual volume)
+    // Landing scale increased from 1.02 to 1.32
     const desk = phase === 'desktop' && !mini
-    const tx = mini ? 0 : desk ? (narrow ? 0 : viewport.width * 0.17) : 0
-    const ty = mini ? 0 : desk ? (narrow ? 0.36 : -0.04) : 0.05
-    const tsc = mini ? 1 : desk ? (narrow ? 0.65 : 0.88) : narrow ? 0.85 : 1.02
+    const tx = mini ? 0 : desk ? (narrow ? 0 : viewport.width * 0.18) : 0
+    const ty = mini ? 0 : desk ? (narrow ? 0.35 : -0.02) : 0.02
+    const tsc = mini ? 1 : desk ? (narrow ? 0.90 : 1.28) : narrow ? 0.95 : 1.32
+
     st.px += (tx - st.px) * Math.min(1, dt * 2.5)
     st.py += (ty - st.py) * Math.min(1, dt * 2.5)
     st.sc += (tsc - st.sc) * Math.min(1, dt * 2.5)
@@ -113,7 +120,7 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     group.current.position.set(st.px, st.py, 0)
     group.current.scale.setScalar(st.sc)
 
-    // Rotation: Slow 3D Rotation (±15–20°) + Mouse Parallax tilt (Reference Board 2)
+    // Rotation: Slow 3D Rotation (±15°) + Mouse Parallax tilt
     const m = mouse.current
     const lockedAngle = typeof window !== 'undefined' ? window.__HOLOGRAM_LOCKED_ANGLE : null
 
@@ -121,14 +128,12 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     let targetRotX: number
 
     if (lockedAngle !== null && lockedAngle !== undefined) {
-      // Locked inspection angle (in radians)
       targetRotY = (lockedAngle * Math.PI) / 180
       targetRotX = 0
     } else {
-      // Continuous smooth idle rotation (±15° = ±0.26 rad)
-      const idleSway = mini || reducedMotion ? 0 : Math.sin(s.clock.elapsedTime * 0.6) * 0.26
-      targetRotY = idleSway + (reducedMotion ? 0 : m.x * 0.45)
-      targetRotX = reducedMotion ? 0 : -m.y * 0.18
+      const idleSway = mini || reducedMotion ? 0 : Math.sin(s.clock.elapsedTime * 0.55) * 0.26
+      targetRotY = idleSway + (reducedMotion ? 0 : m.x * 0.40)
+      targetRotX = reducedMotion ? 0 : -m.y * 0.16
     }
 
     st.vy += (targetRotY - st.ry) * 14 * dt
@@ -139,10 +144,10 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     st.rx += st.vx * dt * 6
     group.current.rotation.set(st.rx, st.ry, 0)
 
-    // Cursor repulsion in world space
+    // Cursor interaction: strictly on peripheral tips (face is protected by aProtect)
     if (!mini && m.active && !reducedMotion && lockedAngle === null) {
-      st.mx += (m.x * viewport.width * 0.5 - st.mx) * Math.min(1, dt * 12)
-      st.my += (m.y * viewport.height * 0.5 - st.my) * Math.min(1, dt * 12)
+      st.mx += (m.x * viewport.width * 0.5 - st.mx) * Math.min(1, dt * 10)
+      st.my += (m.y * viewport.height * 0.5 - st.my) * Math.min(1, dt * 10)
       u.uMouse.value.set(st.mx, st.my)
     } else {
       u.uMouse.value.set(99, 99)
@@ -151,8 +156,8 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     // Camera parallax
     if (!mini) {
       const cam = s.camera
-      const targetCamX = reducedMotion || lockedAngle !== null ? 0 : m.x * 0.30
-      const targetCamY = reducedMotion || lockedAngle !== null ? 0 : m.y * 0.16
+      const targetCamX = reducedMotion || lockedAngle !== null ? 0 : m.x * 0.25
+      const targetCamY = reducedMotion || lockedAngle !== null ? 0 : m.y * 0.14
       cam.position.x += (targetCamX - cam.position.x) * Math.min(1, dt * 2)
       cam.position.y += (targetCamY - cam.position.y) * Math.min(1, dt * 2)
       cam.lookAt(0, 0, 0)
@@ -168,6 +173,7 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
           <bufferAttribute attach="attributes-aStart" args={[data.start, 3]} />
           <bufferAttribute attach="attributes-aRand" args={[data.rand, 4]} />
           <bufferAttribute attach="attributes-aNormal" args={[data.normal, 3]} />
+          <bufferAttribute attach="attributes-aProtect" args={[data.protect, 1]} />
         </bufferGeometry>
         <shaderMaterial
           ref={mat}
