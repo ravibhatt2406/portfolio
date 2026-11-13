@@ -6,21 +6,12 @@ uniform float uSize;
 uniform float uPixelRatio;
 uniform vec2  uMouse;      // world-space xy at hologram plane
 uniform float uRepel;
-uniform float uScanY;      // Sweeping scan beam Y position
-uniform float uScanGlow;   // Intensity of scan beam (0..1)
-uniform float uPulse;      // Soft periodic breathing energy pulse (0..1)
-
 attribute vec3 aStart;
-attribute vec4 aRand;      // x: phase, y: size, z: category/type, w: tone
-attribute vec3 aNormal;    // Surface normal for volumetric lighting & facing
-attribute float aProtect;  // Facial protection mask (1.0 = protected face, 0.0 = peripheral)
-
+attribute vec4 aRand;      // x random, y size, z category/type, w luminance/contrast
 varying float vLum;
 varying float vDepth;
 varying float vType;
 varying float vAlpha;
-varying float vScan;
-varying float vPulse;
 
 void main() {
   // Smooth non-linear assembly with per-particle jitter
@@ -28,75 +19,59 @@ void main() {
   p = p * p * (3.0 - 2.0 * p);
   vec3 pos = mix(aStart, position, p);
 
-  // Gentle vortex swirl during initial assembly
-  float sw = (1.0 - p) * 1.6 * (aRand.x - 0.5);
+  // Gentle vortex swirl while travelling inward during intro assembly
+  float sw = (1.0 - p) * 1.8 * (aRand.x - 0.5);
   float c = cos(sw), s = sin(sw);
   pos.xz = mat2(c, -s, s, c) * pos.xz;
 
-  // Spatially coherent breathing: anchored strictly to original positions
+  // Organic, spatially coherent idle breathing motion (preserves anatomical facial landmarks)
   float t = uTime * uMotion;
-  float breathe = sin(t * 1.4) * 0.003;
-  vec3 breatheVec = vec3(
-    pos.x * breathe * 0.5,
-    pos.y * breathe * 0.6 + sin(t * 1.4) * 0.002,
-    pos.z * breathe * 0.5
+  // Continuous wave across the bust so neighboring particles move together
+  vec3 sway = vec3(
+    sin(t * 0.55 + pos.y * 0.75) * 0.006,
+    cos(t * 0.45 + pos.x * 0.65) * 0.004,
+    sin(t * 0.65 + pos.y * 1.1) * 0.010
   );
+  // Microscopic stardust drift (microscopic, never distorts eyes/nose/mouth/beard)
+  vec3 micro = vec3(
+    sin(t * 1.2 + aRand.x * 6.283),
+    cos(t * 1.1 + aRand.x * 4.1),
+    sin(t * 1.3 + aRand.x * 5.3)
+  ) * 0.0012;
 
-  pos += breatheVec * p + vec3(sin(t + aRand.x * 6.28), cos(t + aRand.x * 4.0), 0.0) * (0.02 * (1.0 - p));
+  pos += (sway + micro) * p + vec3(sin(t + aRand.x * 6.28), cos(t + aRand.x * 4.0), 0.0) * (0.04 * (1.0 - p));
 
   // Dispersion burst on transition
   vec3 dir = normalize(position + vec3(0.0001));
-  pos += dir * uBurst * (0.6 + aRand.x * 2.0);
+  pos += dir * uBurst * (0.7 + aRand.x * 2.5);
 
   vec4 wp = modelMatrix * vec4(pos, 1.0);
 
-  // Thin, elegant holographic scan plane in world space (width +-0.016)
-  float scanDist = abs(wp.y - uScanY);
-  float scanFactor = smoothstep(0.016, 0.0, scanDist) * uScanGlow;
-
-  // Strict Facial Protection against Cursor Distortion:
-  // All facial features (eyes, nose, mouth, beard, jaw, forehead) have aProtect = 1.0 => displacement is 0.0!
-  // Only outermost peripheral hair tips or outer shoulder edges (aProtect < 1.0) respond with subtle micro-displacement.
+  // Cursor repulsion temporarily disabled (Phase 4.D) to guarantee 100% facial feature stability
+  // Parallax tilt in ParticleHologram provides responsive 3D interaction without particle displacement
   vec2 d = wp.xy - uMouse;
   float dist = length(d);
-  float allowMove = 1.0 - aProtect;
-  float f = smoothstep(0.32, 0.0, dist) * uRepel * allowMove;
-  // Maximum displacement strictly clamped to 0.012 world units (microscopic vibration)
-  wp.xy += normalize(d + vec2(0.0001)) * f * 0.012;
-  wp.z  += f * 0.006;
+  float f = smoothstep(0.85, 0.0, dist) * uRepel * 0.0;
+  wp.xy += normalize(d + vec2(0.0001)) * f;
 
   vec4 mv = viewMatrix * wp;
   gl_Position = projectionMatrix * mv;
 
-  // Volumetric view-direction facing factor:
-  // Forward-facing particles are fully luminous (1.0).
-  // Silhouettes & rims retain brilliant holographic edge glow (~0.65).
-  // Backward-facing particles attenuate smoothly so opposite surfaces do not create double-vision ghosts.
-  vec3 vNorm = normalize(mat3(modelMatrix) * aNormal);
-  vec3 viewDir = normalize(cameraPosition - wp.xyz);
-  float ndotv = dot(vNorm, viewDir);
-  float facing = smoothstep(-0.25, 0.25, ndotv) * 0.92 + 0.08;
-
   // Depth normalization for volumetric coloring
-  float depthN = clamp((pos.z + 0.45) / 0.95, 0.0, 1.0);
+  float depthN = clamp((pos.z + 0.35) / 0.85, 0.0, 1.0);
 
-  // Crisp high-definition point sizing (typically 2.4 - 3.4 pixels)
-  float sizeBase = (1.40 + aRand.y * 0.40) * (0.90 + depthN * 0.25);
-  // Razor-sharp points for facial hair / pupils
-  if (aRand.z < 0.18) sizeBase *= 0.85;
-  // Bright catchlights
-  if (aRand.z > 0.90) sizeBase *= 1.30;
-  // Refined scan glint without blowing out
-  sizeBase *= (1.0 + scanFactor * 0.30);
+  // High-definition point sizing: crisp fine points so facial features don't blur into solid blobs
+  float sizeBase = (1.08 + aRand.y * 0.68) * (0.85 + depthN * 0.35);
+  // Refine point size for facial hair / pupils to keep them razor-sharp
+  if (aRand.z < 0.18) sizeBase *= 0.88;
+  // Slight boost for sparkling catchlights and nose bridge highlights
+  if (aRand.w > 0.80 && aRand.z > 0.68) sizeBase *= 1.18;
 
   gl_PointSize = uSize * uPixelRatio * sizeBase * (4.2 / -mv.z);
 
   vLum = aRand.w;
   vDepth = depthN;
   vType = aRand.z;
-  vScan = scanFactor;
-  vPulse = uPulse;
-  // Alpha: base tone + view facing + subtle low-frequency ambient shimmer
-  float ambientShimmer = 0.94 + 0.06 * sin(uTime * uMotion * 1.2 + aRand.x * 6.28);
-  vAlpha = (0.65 + 0.35 * aRand.w) * facing * ambientShimmer * mix(0.4, 1.0, p);
+  // Alpha: base luminance + subtle shimmer + assembly blend
+  vAlpha = (0.55 + 0.45 * aRand.w) * (0.86 + 0.14 * sin(uTime * uMotion * 1.8 + aRand.x * 12.0)) * mix(0.3, 1.0, p);
 }

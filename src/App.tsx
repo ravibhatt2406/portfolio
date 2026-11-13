@@ -14,6 +14,7 @@ function hasWebGL() {
 }
 
 export default function App() {
+  if (typeof window !== 'undefined') (window as any).useDesktop = useDesktop
   const phase = useDesktop((s) => s.phase)
   const mouse = useMousePosition()
   const bp = useBreakpoint()

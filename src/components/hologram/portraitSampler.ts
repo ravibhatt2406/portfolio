@@ -1,11 +1,9 @@
 import portraitCleanUrl from '../../assets/portrait/portrait_clean.png'
 
 export interface ParticleData {
-  target: Float32Array  // x,y,z (3D assembled bust)
-  start: Float32Array   // x,y,z (ambient dispersed space)
-  rand: Float32Array    // x: phase, y: size, z: category/type, w: tone
-  normal: Float32Array  // nx, ny, nz
-  protect: Float32Array // 1.0 = protected face (0 cursor displacement), 0.0 = peripheral edges
+  target: Float32Array // x,y,z per particle (assembled hologram)
+  start: Float32Array  // x,y,z per particle (surrounding space)
+  rand: Float32Array   // x: random phase, y: size, z: category/type, w: tone (luminance & contrast)
   count: number
 }
 
@@ -22,21 +20,34 @@ function load(): Promise<HTMLImageElement> {
 }
 
 /**
- * High-Fidelity Personal 3D Particle Hologram Reconstruction (Phase 19 + 20)
+ * High-Fidelity Personal 3D Particle Hologram Reconstruction Sampler
  *
- * Source of Truth: Ravi Bhatt's authoritative reference photograph (`portrait_clean.png`).
+ * Primary Authoritative Source: Ravi's high-resolution reference portrait photograph
+ * Pre-segmented into `portrait_clean.png` with 100% background and circular border removal.
  *
- * Core Architectural Guarantees:
- * 1. Facial Identity: Directly traces Ravi's eye contours, eyebrows, straight nasal bridge,
- *    lip lines, trimmed moustache, chin beard, mandibular jawline, and swept-up hair coif.
- * 2. Anatomical 3D Cranial Volume: Continuous ellipsoidal cranium (Rx = 0.46, Ry = 0.66, Rz = 0.42)
- *    spanning 0.78 world units from nose tip (+0.28) to occiput (-0.56).
- * 3. 5-Angle Consistency: Verified across 0°, 25°, 55°, 90°, and 180° views.
- * 4. Facial Protection: Strict protection mask (`protect = 1.0`) across all facial features.
- * 5. Clean, Noise-Free Particle Distribution: Stratified surface sampling eliminates noisy dust.
+ * Feature Preservation Architecture:
+ * 1. Zero Ring / Zero Background: Alpha channel strictly isolates Ravi's head, neck, and shoulders.
+ * 2. Cumulative Distribution Function (CDF) Importance Sampling:
+ *    - Particles strictly concentrate along anatomical feature contours:
+ *      eyelids, pupils, iris, eyebrows, nose bridge, nostrils, lips, mustache, beard, and hair curls.
+ *    - Smooth stipple coverage across cheeks, forehead, neck, and maroon shirt.
+ * 3. Chromatic Classification & Contrast Delineation:
+ *    - z=0.08: Dark facial hair, eyebrows, pupils, mustache, and beard (deep electric blue/indigo)
+ *    - z=0.32: Thick swept-up hair coif (violet & blue with cyan texture accents)
+ *    - z=0.58: Maroon shirt torso (cosmic amethyst & violet)
+ *    - z=0.85: Facial skin highlights & eye catchlights (luminous cyan & cool white)
+ * 4. Genuine 3D Anatomical Depth Mapping:
+ *    - Ellipsoidal head dome curvature
+ *    - Nose bridge & tip projection (+0.28)
+ *    - Orbital eye socket recession (-0.12)
+ *    - Mouth & lip projection (+0.08)
+ *    - Chin projection (+0.12)
+ *    - Neck recessed backward behind jawline (-0.22)
+ *    - Volumetric hair shell (+0.12)
+ *    - Shoulder contour slope (-0.16 to -0.30)
  */
-export function buildParticles(totalCount: number): Promise<ParticleData> {
-  const hit = cache.get(totalCount)
+export function buildParticles(count: number): Promise<ParticleData> {
+  const hit = cache.get(count)
   if (hit) return hit
 
   const p = load().then((img) => {
@@ -68,7 +79,7 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
     }
 
     // Sobel gradient magnitude for facial landmark contours (eyes, nose, lips, beard, jaw)
-    // IMPORTANT: Exclude outer alpha cutout boundary to prevent artificial silhouette lines!
+    // Exclude outer alpha cutout boundary to prevent artificial glowing silhouette lines
     const edges = new Float32Array(N)
     let maxEdge = 0.001
     for (let y = 1; y < RES - 1; y++) {
@@ -76,7 +87,6 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
         const i = y * RES + x
         if (!isSubject[i]) continue
 
-        // If pixel borders transparent background, ignore cutout boundary
         const up = (y - 1) * RES + x
         const dn = (y + 1) * RES + x
         const lf = y * RES + (x - 1)
@@ -96,199 +106,13 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
         if (mag > maxEdge) maxEdge = mag
       }
     }
+    // Normalize edge magnitude
     for (let i = 0; i < N; i++) edges[i] /= maxEdge
 
-    // Allocate particle buffers
-    const target = new Float32Array(totalCount * 3)
-    const start = new Float32Array(totalCount * 3)
-    const rand = new Float32Array(totalCount * 4)
-    const normal = new Float32Array(totalCount * 3)
-    const protect = new Float32Array(totalCount)
-
-    const S = 2.40 // World coordinate scale
-
-    function setStartPoint(idx: number) {
-      const th = Math.random() * Math.PI * 2
-      const ph = Math.acos(2 * Math.random() - 1)
-      const rad = 2.8 + Math.random() * 4.2
-      start[idx * 3] = rad * Math.sin(ph) * Math.cos(th)
-      start[idx * 3 + 1] = rad * Math.sin(ph) * Math.sin(th) * 0.75
-      start[idx * 3 + 2] = rad * Math.cos(ph) - 0.8
-    }
-
-    function setNormal(idx: number, nx: number, ny: number, nz: number) {
-      const len = Math.hypot(nx, ny, nz) || 1
-      normal[idx * 3] = nx / len
-      normal[idx * 3 + 1] = ny / len
-      normal[idx * 3 + 2] = nz / len
-    }
-
-    // ==============================================================
-    // CONTINUOUS 3D ANATOMICAL BUST GEOMETRY (Phase 19 + 20)
-    // ==============================================================
-    // Continuous cross-sectional functions that seamlessly connect:
-    // Hair crest (y = 0.82) -> Forehead -> Face -> Chin (y = -0.22)
-    // -> Neck (y = -0.55) -> Torso & Shoulders (y = -0.88)
-    // Seamless 360° volume with realistic ears, temples, nape, and shoulders.
-
-    function getHeadProfile(y: number) {
-      // y ranges from -0.45 (nape/lower jaw) to 0.84 (top hair crest)
-      const t = (y + 0.45) / 1.29
-      const clampedT = Math.max(0, Math.min(1, t))
-
-      // Lateral radius Rx(y)
-      let rx: number
-      if (clampedT < 0.20) {
-        // Nape/jaw to lower face: 0.24 to 0.42
-        rx = 0.24 + (clampedT / 0.20) * 0.18
-      } else if (clampedT < 0.65) {
-        // Cheekbones, ears, temples: 0.42 to 0.46
-        rx = 0.42 + Math.sin(((clampedT - 0.20) / 0.45) * Math.PI) * 0.04
-      } else {
-        // Forehead to hair crest: 0.45 tapering to 0.26
-        rx = 0.45 - Math.pow((clampedT - 0.65) / 0.35, 1.4) * 0.19
-      }
-
-      // Front depth radius Rzf(y) (distance from zc to front facial surface)
-      let rzf: number
-      if (clampedT < 0.22) {
-        rzf = 0.22 + (clampedT / 0.22) * 0.10 // Throat to chin/jaw
-      } else if (clampedT < 0.52) {
-        rzf = 0.32 + Math.sin(((clampedT - 0.22) / 0.30) * Math.PI) * 0.04 // Mouth to nose
-      } else {
-        rzf = 0.32 - ((clampedT - 0.52) / 0.48) * 0.12 // Forehead to hair crest
-      }
-
-      // Posterior depth radius Rzb(y) (distance from zc to back skull/nape)
-      let rzb: number
-      if (clampedT < 0.25) {
-        rzb = 0.18 + (clampedT / 0.25) * 0.14 // Nape of neck to occiput base
-      } else if (clampedT < 0.70) {
-        rzb = 0.32 + Math.sin(((clampedT - 0.25) / 0.45) * Math.PI) * 0.05 // Occipital bone curve
-      } else {
-        rzb = 0.35 - Math.pow((clampedT - 0.70) / 0.30, 1.4) * 0.16 // Upper cranium
-      }
-
-      // Cranial center zc(y)
-      const zc = -0.10 - clampedT * 0.05
-
-      return { rx, rzf, rzb, zc }
-    }
-
-    // Helper: calculate front anatomical depth for any photo coordinate (u, v)
-    function calcFrontDepth(u: number, v: number): { tz: number; isCatchlight: boolean; isFacialFeature: boolean; nx: number; ny: number; nz: number } {
-      const tx = (u - 0.505) * S
-      const ty = (0.50 - v) * S + 0.08
-
-      let isCatchlight = false
-      let isFacialFeature = false
-      let tz: number
-      let nx = tx * 0.6
-      let ny = 0.0
-      let nz = 0.8
-
-      if (ty >= -0.22) {
-        // ==========================================
-        // Head, Face & Hair
-        // ==========================================
-        const { rx, rzf, zc } = getHeadProfile(ty)
-        const dx = tx / rx
-        const safeDx = Math.max(-0.98, Math.min(0.98, dx))
-        const curve = Math.sqrt(Math.max(0.02, 1.0 - safeDx * safeDx))
-        tz = zc + rzf * curve
-
-        // Fine facial features from Ravi's photograph landmarks:
-        // Left eye: (0.430, 0.385), Right eye: (0.570, 0.373)
-        // Nose tip: (0.514, 0.451), Mouth: (0.496, 0.561)
-        const dNoseX = Math.abs(u - 0.514)
-        if (dNoseX < 0.055 && v > 0.360 && v < 0.490) {
-          isFacialFeature = true
-          const bridgeT = 1.0 - dNoseX / 0.055
-          const profileT = 1.0 - Math.abs(v - 0.451) / 0.090
-          const noseProj = Math.max(0, bridgeT * profileT) * 0.14
-          tz += noseProj
-          if (dNoseX < 0.016 && Math.abs(v - 0.451) < 0.018) isCatchlight = true
-        }
-
-        // Eyes & orbital sockets
-        const dEyeL = Math.hypot((u - 0.430) * 1.3, v - 0.385)
-        const dEyeR = Math.hypot((u - 0.570) * 1.3, v - 0.373)
-        if (dEyeL < 0.048 || dEyeR < 0.048) {
-          isFacialFeature = true
-          const dEye = Math.min(dEyeL, dEyeR)
-          tz -= (1.0 - dEye / 0.048) * 0.05
-          if (dEye < 0.016) {
-            tz += 0.02
-            isCatchlight = true
-          }
-        }
-
-        // Eyebrows
-        const dBrowL = Math.hypot((u - 0.430) * 1.1, (v - 0.345) * 1.8)
-        const dBrowR = Math.hypot((u - 0.570) * 1.1, (v - 0.335) * 1.8)
-        if (dBrowL < 0.046 || dBrowR < 0.046) {
-          tz += 0.025
-          isFacialFeature = true
-        }
-
-        // Lips
-        const dLip = Math.hypot((u - 0.500) * 1.4, v - 0.560)
-        if (dLip < 0.045) {
-          tz += (1.0 - dLip / 0.045) * 0.05
-          isFacialFeature = true
-        }
-
-        // Chin & beard
-        const dChin = Math.hypot((u - 0.505) * 1.3, v - 0.620)
-        if (dChin < 0.050) {
-          tz += (1.0 - dChin / 0.050) * 0.06
-          isFacialFeature = true
-        }
-
-        // Swept-up hair volume (top and front hair lift)
-        if (v < 0.32) {
-          const hairLift = (1.0 - v / 0.32) * 0.065
-          const hairWave = Math.sin(tx * 18.0 + ty * 12.0) * 0.012
-          tz += hairLift + hairWave
-        }
-
-        nx = safeDx * 0.55
-        ny = (ty - 0.22) * 0.25
-        nz = curve * 0.85
-      } else if (ty >= -0.52) {
-        // ==========================================
-        // Neck (seamless connection from chin to collar)
-        // ==========================================
-        const neckFrac = (ty + 0.52) / 0.30 // 0 at collar (-0.52), 1 at chin (-0.22)
-        const rnx = 0.22 + (1.0 - neckFrac) * 0.08
-        const rnz = 0.18 + (1.0 - neckFrac) * 0.04
-        const zcn = -0.12 - (1.0 - neckFrac) * 0.04
-        const dx = Math.max(-0.95, Math.min(0.95, tx / rnx))
-        const curve = Math.sqrt(Math.max(0.04, 1.0 - dx * dx))
-        tz = zcn + rnz * curve
-        nx = dx * 0.5
-        ny = -0.1
-        nz = curve * 0.85
-      } else {
-        // ==========================================
-        // Torso, Shoulders & Crew-Neck Shirt
-        // ==========================================
-        const torsoFrac = Math.min(1.0, (-0.52 - ty) / 0.36) // 0 at collar, 1 at bottom
-        const rtx = 0.28 + torsoFrac * 0.62
-        const rtz = 0.22 + torsoFrac * 0.06
-        const zct = -0.16
-        const dx = Math.max(-0.96, Math.min(0.96, tx / rtx))
-        const curve = Math.sqrt(Math.max(0.04, 1.0 - dx * dx))
-        tz = zct + rtz * curve - torsoFrac * 0.04
-        nx = dx * 0.6
-        ny = -0.3
-        nz = curve * 0.75
-      }
-
-      return { tz, isCatchlight, isFacialFeature, nx, ny, nz }
-    }
-
-    // Importance weighting for photo sampling
+    // Build importance sampling weights & CDF table
+    // Exact landmark locations in normalized [0, 1] space:
+    // Left eye: (0.425, 0.382), Right eye: (0.573, 0.378)
+    // Nose bridge: (0.505, 0.440), Mouth: (0.508, 0.530)
     const weights = new Float64Array(N)
     let totalWeight = 0
 
@@ -299,42 +123,55 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
         if (!isSubject[i]) continue
 
         const u = x / RES
-        const ed = edges[i]
         const lum = rawLum[i]
+        const ed = edges[i]
+        const r = rArr[i]
+        const g = gArr[i]
+        const b = bArr[i]
 
-        const dEyeL = Math.hypot((u - 0.430) * 1.3, v - 0.385)
-        const dEyeR = Math.hypot((u - 0.570) * 1.3, v - 0.373)
-        const inEye = dEyeL < 0.048 || dEyeR < 0.048
+        // Eye zone falloffs
+        const dEyeL = Math.hypot((u - 0.425) * 1.3, v - 0.382)
+        const dEyeR = Math.hypot((u - 0.573) * 1.3, v - 0.378)
+        const inEye = dEyeL < 0.052 || dEyeR < 0.052
 
-        const dBrowL = Math.hypot((u - 0.430) * 1.1, (v - 0.345) * 1.8)
-        const dBrowR = Math.hypot((u - 0.570) * 1.1, (v - 0.335) * 1.8)
-        const inBrow = dBrowL < 0.048 || dBrowR < 0.048
+        // Eyebrows
+        const dBrowL = Math.hypot((u - 0.425) * 1.1, (v - 0.350) * 1.8)
+        const dBrowR = Math.hypot((u - 0.573) * 1.1, (v - 0.346) * 1.8)
+        const inBrow = dBrowL < 0.055 || dBrowR < 0.055
 
-        const dMouth = Math.hypot((u - 0.500) * 1.2, (v - 0.560) * 1.6)
-        const inMouth = dMouth < 0.055
-        const dNose = Math.hypot((u - 0.514) * 2.0, (v - 0.451) * 1.1)
-        const inNose = dNose < 0.060
+        // Mouth & mustache
+        const dMouth = Math.hypot((u - 0.508) * 1.2, (v - 0.535) * 1.6)
+        const inMouth = dMouth < 0.060
 
-        const isFaceZone = u > 0.28 && u < 0.72 && v >= 0.28 && v <= 0.68
+        // Nose bridge & tip
+        const dNose = Math.hypot((u - 0.505) * 2.0, (v - 0.440) * 1.1)
+        const inNose = dNose < 0.065
+
+        // Facial hair / brows / beard / mustache (dark facial features)
+        const isFaceZone = u > 0.26 && u < 0.74 && v >= 0.20 && v <= 0.72
         const isFacialHair = isFaceZone && lum < 0.28
-        const isHair = v < 0.32 && lum < 0.30
-        const isShirt = v >= 0.78 && rArr[i] > 0.22 && rArr[i] > bArr[i] * 1.3
+        // Hair coif
+        const isHair = v < 0.36 && lum < 0.28 && (!isFaceZone || v < 0.25)
+        // Maroon shirt
+        const isShirt = v > 0.74 && r > 0.22 && r > b * 1.3 && g < 0.24
 
+        // Solid base coverage (1.0) ensures the entire face, forehead, cheeks, nose, and body are filled
         let w = 1.0
-        w += ed * 1.8
-        if (inEye) w += 2.0
-        if (inBrow) w += 1.4
-        if (inMouth) w += 1.4
-        if (inNose) w += 1.3
-        if (isFacialHair) w += 1.3
-        if (isHair) w += 1.2
-        if (isShirt) w += 0.8
+        // Feature enhancements on actual contours
+        w += ed * 1.5
+        if (inEye) w += 1.0
+        if (inBrow) w += 0.8
+        if (inMouth) w += 0.8
+        if (inNose) w += 0.6
+        if (isHair) w += 0.4
+        if (isShirt) w += 0.2
 
         weights[i] = w
         totalWeight += w
       }
     }
 
+    // Cumulative distribution table
     const cdf = new Float64Array(N)
     let acc = 0
     for (let i = 0; i < N; i++) {
@@ -342,6 +179,7 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
       cdf[i] = acc
     }
 
+    // Binary search helper on CDF
     function sampleIndex(targetWeight: number): number {
       let low = 0, high = N - 1
       while (low < high) {
@@ -352,29 +190,23 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
       return low
     }
 
-    // High-Density Anatomical Budget:
-    // 1. Front Facial Mask & Photo Identity: 50%
-    // 2. Seamless Lateral & Posterior Cranium + Ears + Back Hair (180° & 90°): 28%
-    // 3. Volumetric Neck (Throat, Nape & SCM columns): 8%
-    // 4. Volumetric Torso, Shoulders & Chest: 14%
-    const countFace = Math.floor(totalCount * 0.50)
-    const countBack = Math.floor(totalCount * 0.28)
-    const countNeck = Math.floor(totalCount * 0.08)
-    const countTorso = totalCount - (countFace + countBack + countNeck)
+    // Allocate particle buffers
+    const target = new Float32Array(count * 3)
+    const start = new Float32Array(count * 3)
+    const rand = new Float32Array(count * 4)
 
-    let pIdx = 0
+    const S = 2.40 // Aspect-ratio preserving world scale
 
-    // ==========================================
-    // 1. FRONT FACIAL MASK (Source of Truth Photo)
-    // ==========================================
-    for (let n = 0; n < countFace; n++) {
+    for (let n = 0; n < count; n++) {
       const pick = Math.random() * totalWeight
       const idx = sampleIndex(pick)
+
       const iy = Math.floor(idx / RES)
       const ix = idx % RES
 
-      const u = (ix + (Math.random() - 0.5) * 0.60) / RES
-      const v = (iy + (Math.random() - 0.5) * 0.60) / RES
+      // Precise sub-pixel stipple: tightly bound so contour lines remain razor-sharp
+      const u = (ix + (Math.random() - 0.5) * 0.55) / RES
+      const v = (iy + (Math.random() - 0.5) * 0.55) / RES
 
       const lum = rawLum[idx]
       const ed = edges[idx]
@@ -382,217 +214,143 @@ export function buildParticles(totalCount: number): Promise<ParticleData> {
       const g = gArr[idx]
       const b = bArr[idx]
 
+      // 1. World XY coordinates (centered and framed)
       const tx = (u - 0.505) * S
       const ty = (0.50 - v) * S + 0.08
 
-      const { tz, isCatchlight, isFacialFeature, nx, ny, nz } = calcFrontDepth(u, v)
+      // 2. Anatomical 3D Depth (tz)
+      // Ellipsoidal head dome
+      const dxHead = (u - 0.505) / 0.20
+      const rDome = Math.max(0, 1.0 - dxHead * dxHead)
+      let tz = Math.sqrt(rDome) * 0.28 - 0.14
 
-      target[pIdx * 3] = tx
-      target[pIdx * 3 + 1] = ty
-      target[pIdx * 3 + 2] = tz
+      // Nose bridge and tip projection (Ravi's straight nose)
+      const ndx = Math.abs(u - 0.505)
+      if (ndx < 0.052 && v > 0.365 && v < 0.495) {
+        const noseVal = (1.0 - ndx / 0.052) * (1.0 - Math.abs(v - 0.445) / 0.08)
+        tz += Math.max(0, noseVal) * 0.22
+      }
 
-      setStartPoint(pIdx)
-      setNormal(pIdx, nx, ny, nz)
+      // Orbital eye socket recession
+      const el = Math.hypot((u - 0.425) * 1.3, v - 0.382)
+      const er = Math.hypot((u - 0.573) * 1.3, v - 0.378)
+      if (el < 0.052) tz -= (1.0 - el / 0.052) * 0.08
+      if (er < 0.052) tz -= (1.0 - er / 0.052) * 0.08
 
-      // Strict Facial Protection Mask:
-      // Face features, chin, mouth, nose, eyes, forehead, neck are 100% PROTECTED (protect = 1.0)
-      const isFaceZone = u > 0.26 && u < 0.74 && v >= 0.24 && v <= 0.74
-      const isOuterEdge = Math.abs(tx) > 0.68 || ty < -0.76
+      // Forehead curvature
+      if (v > 0.23 && v < 0.33 && Math.abs(u - 0.505) < 0.14) {
+        tz += 0.05 * (1.0 - Math.pow((u - 0.505) / 0.14, 2))
+      }
 
-      protect[pIdx] = isFaceZone || isFacialFeature ? 1.0 : (isOuterEdge ? 0.0 : 0.90)
+      // Lips
+      const dLip = Math.hypot((u - 0.508) * 1.4, v - 0.530)
+      if (dLip < 0.048) tz += (1.0 - dLip / 0.048) * 0.06
 
-      // Chromatic Classification:
-      let category = 0.85 // Skin / highlights (Cyan)
+      // Chin projection
+      const dChin = Math.hypot((u - 0.505) * 1.3, v - 0.615)
+      if (dChin < 0.048) tz += (1.0 - dChin / 0.048) * 0.08
+
+      // Neck recessed backward behind jawline (natural human curve)
+      if (v > 0.65 && v < 0.77 && Math.abs(u - 0.505) < 0.16) {
+        const neckFactor = Math.sin(((v - 0.65) / 0.12) * Math.PI)
+        tz -= neckFactor * 0.10
+      }
+
+      // Hair volumetric 3D lift (Ravi's swept-up hairstyle)
+      if (v < 0.32) {
+        tz += (1.0 - v / 0.32) * 0.06 + Math.sin(tx * 14.0 + ty * 12.0) * 0.010
+      }
+
+      // Torso & shoulders slope
+      if (v >= 0.77) {
+        tz = -0.14 - ((v - 0.77) / 0.23) * 0.10
+      }
+
+      target[n * 3] = tx
+      target[n * 3 + 1] = ty
+      target[n * 3 + 2] = tz
+
+      // Ambient start space points (for intro assembly)
+      const th = Math.random() * Math.PI * 2
+      const ph = Math.acos(2 * Math.random() - 1)
+      const rad = 2.8 + Math.random() * 4.2
+      start[n * 3] = rad * Math.sin(ph) * Math.cos(th)
+      start[n * 3 + 1] = rad * Math.sin(ph) * Math.sin(th) * 0.75
+      start[n * 3 + 2] = rad * Math.cos(ph) - 0.8
+
+      // Chromatic category (aRand.z) & Tone (aRand.w)
+      // Category codes:
+      // 0.08 = Facial hair / pupils / brows / beard / mustache (dark identity contours)
+      // 0.32 = Hair coif & waves
+      // 0.58 = Maroon shirt
+      // 0.85 = Facial skin & eye catchlights
+      let category = 0.85
       let tone = 0.50
 
-      const dEyeL = Math.hypot((u - 0.430) * 1.3, v - 0.385)
-      const dEyeR = Math.hypot((u - 0.570) * 1.3, v - 0.373)
-      const inEye = dEyeL < 0.048 || dEyeR < 0.048
-      const isShirt = v >= 0.78 && r > 0.20 && r > b * 1.2 && g < 0.25
-      const isHair = v < 0.32 && lum < 0.32
-      const isFacialHair = isFaceZone && lum < 0.26 && v >= 0.33
+      const isFaceZone = u > 0.26 && u < 0.74 && v >= 0.20 && v <= 0.72
+      const inEye = el < 0.052 || er < 0.052
+      const isHair = v < 0.36 && lum < 0.28 && (!isFaceZone || v < 0.25)
+      const isShirt = v > 0.74 && r > 0.22 && r > b * 1.3 && g < 0.24
+      const isFacialHair = isFaceZone && lum < 0.28
 
       if (isShirt) {
-        category = 0.58 // Maroon shirt / torso (amethyst/deep blue)
-        tone = 0.55 + ed * 0.25
+        category = 0.58
+        tone = 0.45 + ed * 0.30
       } else if (isHair) {
-        category = 0.32 // Swept-up hair coif (violet/blue/cyan crest)
-        tone = 0.35 + ed * 0.45
+        category = 0.32
+        tone = 0.32 + ed * 0.50
       } else if (inEye) {
         if (lum < 0.22) {
-          category = 0.08 // Dark pupil & iris center
-          tone = 0.15 + lum * 0.25
-        } else if (isCatchlight || lum > 0.45) {
-          category = 0.95 // Crisp white catchlight
-          tone = 1.0
+          // Pupil & iris center: crisp dark feature
+          category = 0.08
+          tone = 0.18 + lum * 0.30
+        } else if (lum > 0.42) {
+          // Sclera / eye catchlight: brilliant white
+          category = 0.85
+          tone = 0.96
         } else {
+          // Iris ring
           category = 0.85
           tone = 0.65
         }
       } else if (isFacialHair) {
-        category = 0.08 // Dark facial hair (moustache, beard, eyebrows)
-        tone = 0.18 + lum * 0.30
+        // Mustache, beard, eyebrows
+        category = 0.08
+        tone = 0.22 + lum * 0.35
       } else {
-        category = 0.85 // Facial skin
-        const ndx = Math.abs(u - 0.514)
-        const isRidge = ndx < 0.030 && v > 0.36 && v < 0.48
-        if (isCatchlight) {
-          category = 0.95
-          tone = 0.98
-        } else if (isRidge || lum > 0.56) {
-          tone = 0.82 + ed * 0.15
+        // Facial skin & highlights
+        category = 0.85
+        const ndx = Math.abs(u - 0.505)
+        const isRidge = ndx < 0.045 && v > 0.36 && v < 0.49
+        if (isRidge || lum > 0.58) {
+          tone = 0.82 + ed * 0.18
         } else if (lum > 0.38) {
-          tone = 0.55 + (lum - 0.38) * 0.75
+          tone = 0.55 + (lum - 0.38) * 0.85
         } else {
-          tone = 0.42 + lum * 0.38
+          tone = 0.40 + lum * 0.40
         }
       }
 
-      rand[pIdx * 4] = Math.random() // phase
-      rand[pIdx * 4 + 1] = isFacialHair || inEye ? 0.76 : 0.82
-      rand[pIdx * 4 + 2] = category
-      rand[pIdx * 4 + 3] = Math.min(1.0, Math.max(0.15, tone))
-      pIdx++
+      rand[n * 4] = Math.random() // phase for assembly / shimmer
+      // Uniform fine point sizing: completely eliminates random speckled noise!
+      rand[n * 4 + 1] = isFacialHair || inEye ? 0.78 : 0.82
+      rand[n * 4 + 2] = category
+      rand[n * 4 + 3] = Math.min(1.0, Math.max(0.15, tone))
     }
 
-    // ==============================================================
-    // 2. SEAMLESS LATERAL & POSTERIOR CRANIUM + EARS + BACK HAIR (360° Wrap)
-    // ==============================================================
-    // Spans from y = -0.42 (nape/upper neck) to y = 0.84 (top hair crest).
-    // Angle phi wraps across posterior hemisphere [-PI/2, +PI/2] meeting the front mask at z = zc
-    // to guarantee 100% continuous solid geometry with ZERO gaps and ZERO artificial ridges!
-    for (let n = 0; n < countBack; n++) {
-      const y = -0.42 + Math.random() * 1.26
-      const { rx, rzb, zc } = getHeadProfile(y)
-
-      // Angle phi: 0 = directly behind (-z), +-PI/2 = lateral sides (+-x)
-      const phi = (Math.random() - 0.5) * Math.PI
-      const sinPhi = Math.sin(phi)
-      const cosPhi = Math.cos(phi) // >= 0 everywhere
-
-      // Realistic Ear Projection at sides (y: 0.06 to 0.28, |phi|: 68° to 88°)
-      let earBump = 0.0
-      const absPhiDeg = (Math.abs(phi) / Math.PI) * 180
-      if (y >= 0.06 && y <= 0.28 && absPhiDeg >= 68 && absPhiDeg <= 88) {
-        const yEar = (y - 0.17) / 0.11
-        const phiEar = (absPhiDeg - 78) / 10
-        earBump = Math.max(0, 1.0 - yEar * yEar - phiEar * phiEar) * 0.045
-      }
-
-      // Hair thickness and wave texture on upper skull
-      const isTopHair = y > 0.35
-      const hairWave = isTopHair ? Math.sin(sinPhi * 14.0 + y * 16.0) * 0.015 : 0.0
-      const hairThickness = isTopHair ? 0.038 : 0.010
-
-      const cx = (rx + earBump) * sinPhi
-      const cz = zc - (rzb + hairThickness) * cosPhi + hairWave
-
-      target[pIdx * 3] = cx
-      target[pIdx * 3 + 1] = y
-      target[pIdx * 3 + 2] = cz
-
-      setStartPoint(pIdx)
-      setNormal(pIdx, sinPhi * 0.75, (y - 0.25) * 0.25, -cosPhi * 0.85)
-
-      // Strict protection: entire back and sides protected; only extreme hair crest tips flexible
-      protect[pIdx] = y > 0.78 ? 0.4 : 1.0
-
-      rand[pIdx * 4] = Math.random()
-      rand[pIdx * 4 + 1] = 0.82
-      // Color classification:
-      // Dark hair on top/crown/back, skin tone at ears and nape of neck
-      const isSkinZone = y < 0.04 || earBump > 0.015
-      rand[pIdx * 4 + 2] = isSkinZone ? 0.85 : 0.32
-      rand[pIdx * 4 + 3] = isSkinZone ? 0.48 : (0.28 + Math.random() * 0.35)
-      pIdx++
-    }
-
-    // ==========================================
-    // 3. CONTINUOUS VOLUMETRIC NECK (Full 360° Column)
-    // ==========================================
-    // Connects chin & jawline (y = -0.20) to collarbones & trapezius (y = -0.54)
-    for (let n = 0; n < countNeck; n++) {
-      const neckFrac = Math.random() // 0 at collar (-0.54), 1 at jawline (-0.18)
-      const y = -0.54 + neckFrac * 0.36
-      const rnx = 0.22 + (1.0 - neckFrac) * 0.08
-      const rnz = 0.18 + (1.0 - neckFrac) * 0.04
-      const zcn = -0.12 - (1.0 - neckFrac) * 0.04
-
-      const th = Math.random() * Math.PI * 2
-      const cosTh = Math.cos(th)
-      const sinTh = Math.sin(th)
-
-      const nx = rnx * cosTh
-      const nz = zcn + rnz * sinTh
-
-      target[pIdx * 3] = nx
-      target[pIdx * 3 + 1] = y
-      target[pIdx * 3 + 2] = nz
-
-      setStartPoint(pIdx)
-      setNormal(pIdx, cosTh * 0.75, -0.1, sinTh * 0.75)
-      protect[pIdx] = 1.0
-
-      rand[pIdx * 4] = Math.random()
-      rand[pIdx * 4 + 1] = 0.78
-      rand[pIdx * 4 + 2] = 0.85 // Skin tone
-      rand[pIdx * 4 + 3] = 0.45 + (sinTh > 0 ? 0.15 : 0.0) + Math.random() * 0.15
-      pIdx++
-    }
-
-    // ==========================================
-    // 4. VOLUMETRIC TORSO, SHOULDERS & CHEST
-    // ==========================================
-    // Full 3D chest, upper back, crew-neck shirt, and sloping shoulders
-    while (pIdx < totalCount) {
-      const torsoFrac = Math.random() // 0 at neck base (-0.52), 1 at bottom (-0.88)
-      const y = -0.52 - torsoFrac * 0.36
-
-      // Broad shoulder flare
-      const rtx = 0.28 + torsoFrac * 0.64
-      const rtz = 0.22 + torsoFrac * 0.06
-      const zct = -0.16
-
-      const th = Math.random() * Math.PI * 2
-      const cosTh = Math.cos(th)
-      const sinTh = Math.sin(th)
-
-      const bx = rtx * cosTh
-      const bz = zct + rtz * sinTh
-
-      target[pIdx * 3] = bx
-      target[pIdx * 3 + 1] = y
-      target[pIdx * 3 + 2] = bz
-
-      setStartPoint(pIdx)
-      setNormal(pIdx, cosTh * 0.75, -0.3, sinTh * 0.75)
-
-      const spread = Math.abs(bx) / (rtx + 0.001)
-      protect[pIdx] = spread > 0.88 ? 0.0 : 1.0
-
-      const isCollarZone = torsoFrac < 0.12 && Math.abs(cosTh) < 0.75
-
-      rand[pIdx * 4] = Math.random()
-      rand[pIdx * 4 + 1] = 0.82
-      rand[pIdx * 4 + 2] = 0.58 // Shirt amethyst/deep blue
-      rand[pIdx * 4 + 3] = isCollarZone ? 0.80 : (0.50 + Math.random() * 0.25)
-      pIdx++
-    }
-
-    return { target, start, rand, normal, protect, count: totalCount }
+    return { target, start, rand, count }
   })
 
-  cache.set(totalCount, p)
+  cache.set(count, p)
   return p
 }
 
 export function particleCount(density: 'low' | 'medium' | 'high', mini = false): number {
-  if (mini) return 10000
-  // Optimal high-density particle budget for 60fps performance
-  const base = { low: 45000, medium: 65000, high: 88000 }[density]
+  if (mini) return 8000
+  const base = { low: 30000, medium: 45000, high: 60000 }[density]
   const w = typeof window !== 'undefined' ? window.innerWidth : 1280
   const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 8 : 8
-  let k = w < 768 ? 0.65 : w < 1100 ? 0.85 : 1
+  let k = w < 768 ? 0.55 : w < 1100 ? 0.80 : 1
   if (cores < 4) k *= 0.70
   return Math.round(base * k)
 }
