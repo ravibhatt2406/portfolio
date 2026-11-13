@@ -247,3 +247,4 @@ run().catch((err) => {
   console.error('Error during capture:', err);
   process.exit(1);
 });
+

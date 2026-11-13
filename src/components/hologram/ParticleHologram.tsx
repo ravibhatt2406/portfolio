@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import vert from '../../shaders/particle.vert?raw'
 import frag from '../../shaders/particle.frag?raw'
 import { buildParticles, type ParticleData } from './portraitSampler'
+import { AmbientParticles } from './AmbientParticles'
 import { useDesktop } from '../../store/desktopStore'
 
 interface Props {
@@ -54,7 +55,7 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
     uSize: { value: mini ? 1.40 : 1.35 },
     uPixelRatio: { value: Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2) },
     uMouse: { value: new THREE.Vector2(99, 99) },
-    // Phase 4.D: Cursor repulsion force disabled to guarantee 100% facial feature stability
+    // Phase 21: Controlled micro-cursor interaction (protects facial core, deflects outer periphery)
     uRepel: { value: 0 },
     uDim: { value: 1 },
   }), [mini])
@@ -130,6 +131,19 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
       cam.position.y += (targetCamY - cam.position.y) * Math.min(1, dt * 2)
       cam.lookAt(0, 0, 0)
     }
+
+    // Visibility inspection toggle for preview captures
+    const showInt = typeof window !== 'undefined' ? window.__TOGGLE_HOLOGRAM_INTERNAL !== false : true
+    mat.current.visible = showInt
+
+    // Cursor coordinates for internal particle micro-deflection
+    if (m && m.active) {
+      u.uMouse.value.set(m.x * 2.2, m.y * 1.8)
+      u.uRepel.value = 1.0
+    } else {
+      u.uMouse.value.set(999, 999)
+      u.uRepel.value = 0.0
+    }
   })
 
   if (!data) return null
@@ -140,12 +154,14 @@ export function ParticleHologram({ count, mouse, mini = false }: Props) {
           <bufferAttribute attach="attributes-position" args={[data.target, 3]} />
           <bufferAttribute attach="attributes-aStart" args={[data.start, 3]} />
           <bufferAttribute attach="attributes-aRand" args={[data.rand, 4]} />
+          <bufferAttribute attach="attributes-aProtect" args={[data.protect, 1]} />
         </bufferGeometry>
         <shaderMaterial
           ref={mat} uniforms={uniforms} vertexShader={vert} fragmentShader={frag}
           transparent depthWrite={false} blending={THREE.AdditiveBlending}
         />
       </points>
+      <AmbientParticles mouse={mouse} mini={mini} />
     </group>
   )
 }

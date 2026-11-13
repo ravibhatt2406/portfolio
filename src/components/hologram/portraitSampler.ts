@@ -4,6 +4,7 @@ export interface ParticleData {
   target: Float32Array // x,y,z per particle (assembled hologram)
   start: Float32Array  // x,y,z per particle (surrounding space)
   rand: Float32Array   // x: random phase, y: size, z: category/type, w: tone (luminance & contrast)
+  protect: Float32Array // 0..1 facial anatomical preservation factor (1.0 = core facial features, 0 = periphery)
   count: number
 }
 
@@ -194,6 +195,7 @@ export function buildParticles(count: number): Promise<ParticleData> {
     const target = new Float32Array(count * 3)
     const start = new Float32Array(count * 3)
     const rand = new Float32Array(count * 4)
+    const protect = new Float32Array(count)
 
     const S = 2.40 // Aspect-ratio preserving world scale
 
@@ -336,9 +338,30 @@ export function buildParticles(count: number): Promise<ParticleData> {
       rand[n * 4 + 1] = isFacialHair || inEye ? 0.78 : 0.82
       rand[n * 4 + 2] = category
       rand[n * 4 + 3] = Math.min(1.0, Math.max(0.15, tone))
+
+      // Anatomical feature protection factor for Dual Particle System (Phase 21)
+      // 1.0 = Strict facial landmark preservation (eyes, nose, mouth, beard, chin, jawline)
+      // 0.85 = Neck support
+      // 0.0 - 0.5 = Outer hair crest & outer shoulder edges (can carry subtle organic energy waves & soft cursor deflection)
+      let prot = 0.0
+      const dFaceOval = Math.pow((u - 0.505) / 0.165, 2) + Math.pow((v - 0.44) / 0.22, 2)
+      if (inEye || isFacialHair || dFaceOval < 1.0) {
+        // Core facial identity: eyes, brows, nose, lips, beard, jawline, chin, cheeks
+        prot = 1.0
+      } else if (v >= 0.65 && v <= 0.78 && Math.abs(u - 0.505) < 0.16) {
+        // Neck column
+        prot = 0.85
+      } else if (v > 0.78) {
+        // Torso / shoulders: fade to 0 towards outer edges
+        prot = Math.max(0.0, 0.60 - Math.abs(u - 0.505) * 1.5)
+      } else if (v < 0.36) {
+        // Hair: inner hair preserved, outer crest and wisps have subtle movement
+        prot = Math.max(0.0, 0.80 - (0.34 - v) * 3.5 - Math.abs(u - 0.505) * 2.2)
+      }
+      protect[n] = Math.min(1.0, Math.max(0.0, prot))
     }
 
-    return { target, start, rand, count }
+    return { target, start, rand, protect, count }
   })
 
   cache.set(count, p)

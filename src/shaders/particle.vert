@@ -8,6 +8,7 @@ uniform vec2  uMouse;      // world-space xy at hologram plane
 uniform float uRepel;
 attribute vec3 aStart;
 attribute vec4 aRand;      // x random, y size, z category/type, w luminance/contrast
+attribute float aProtect;  // 1.0 = face core (eyes, nose, mouth, beard), 0.0 = periphery
 varying float vLum;
 varying float vDepth;
 varying float vType;
@@ -28,18 +29,33 @@ void main() {
   float t = uTime * uMotion;
   // Continuous wave across the bust so neighboring particles move together
   vec3 sway = vec3(
-    sin(t * 0.55 + pos.y * 0.75) * 0.006,
-    cos(t * 0.45 + pos.x * 0.65) * 0.004,
-    sin(t * 0.65 + pos.y * 1.1) * 0.010
+    sin(t * 0.55 + pos.y * 0.75) * 0.005,
+    cos(t * 0.45 + pos.x * 0.65) * 0.003,
+    sin(t * 0.65 + pos.y * 1.1) * 0.008
   );
+
+  // Flowing living energy projection (Phase 21: Internal Hologram Particle Movement)
+  // Cohesive surface harmonic wave that oscillates around original target positions
+  float flowPhase = t * 1.5 + pos.y * 3.8 + pos.x * 2.2;
+  vec3 flow = vec3(
+    sin(flowPhase) * 0.004,
+    cos(flowPhase * 0.9 + pos.z * 2.5) * 0.003,
+    sin(flowPhase * 1.1 + pos.x * 1.8) * 0.005
+  );
+
   // Microscopic stardust drift (microscopic, never distorts eyes/nose/mouth/beard)
   vec3 micro = vec3(
     sin(t * 1.2 + aRand.x * 6.283),
     cos(t * 1.1 + aRand.x * 4.1),
     sin(t * 1.3 + aRand.x * 5.3)
-  ) * 0.0012;
+  ) * 0.0010;
 
-  pos += (sway + micro) * p + vec3(sin(t + aRand.x * 6.28), cos(t + aRand.x * 4.0), 0.0) * (0.04 * (1.0 - p));
+  // Modulate flow by anatomical protection factor:
+  // Face core (aProtect = 1.0): subtle micro-oscillation (0.18 scale -> amplitude <= 0.001), 100% facial stability
+  // Outer hair tips and shoulders (aProtect = 0.0): visible flowing energy wave
+  float motionIntensity = mix(1.0, 0.18, aProtect);
+  pos += (sway + flow * motionIntensity + micro * (1.0 - aProtect * 0.85)) * p +
+         vec3(sin(t + aRand.x * 6.28), cos(t + aRand.x * 4.0), 0.0) * (0.04 * (1.0 - p));
 
   // Dispersion burst on transition
   vec3 dir = normalize(position + vec3(0.0001));
@@ -47,12 +63,16 @@ void main() {
 
   vec4 wp = modelMatrix * vec4(pos, 1.0);
 
-  // Cursor repulsion temporarily disabled (Phase 4.D) to guarantee 100% facial feature stability
-  // Parallax tilt in ParticleHologram provides responsive 3D interaction without particle displacement
+  // Controlled micro-cursor interaction (Phase 21):
+  // Face core particles: zero or microscopic movement (<= 0.002 displacement)
+  // Hair tips / outer shoulders: subtle gentle deflection (<= 0.015 displacement)
+  // Completely eliminates tearing, holes, or explosive scattering
   vec2 d = wp.xy - uMouse;
   float dist = length(d);
-  float f = smoothstep(0.85, 0.0, dist) * uRepel * 0.0;
-  wp.xy += normalize(d + vec2(0.0001)) * f;
+  float repelFactor = smoothstep(0.80, 0.0, dist) * uRepel;
+  float maxDisp = mix(0.015, 0.002, aProtect);
+  vec2 cursorDisp = normalize(d + vec2(0.0001)) * repelFactor * maxDisp;
+  wp.xy += cursorDisp;
 
   vec4 mv = viewMatrix * wp;
   gl_Position = projectionMatrix * mv;
@@ -69,9 +89,11 @@ void main() {
 
   gl_PointSize = uSize * uPixelRatio * sizeBase * (4.2 / -mv.z);
 
-  vLum = aRand.w;
+  // Slight variations in particle brightness for flowing energy appearance
+  float shimmer = 0.94 + 0.06 * sin(t * 2.0 + aRand.x * 6.28 + pos.y * 4.0);
+  vLum = aRand.w * shimmer;
   vDepth = depthN;
   vType = aRand.z;
   // Alpha: base luminance + subtle shimmer + assembly blend
-  vAlpha = (0.55 + 0.45 * aRand.w) * (0.86 + 0.14 * sin(uTime * uMotion * 1.8 + aRand.x * 12.0)) * mix(0.3, 1.0, p);
+  vAlpha = (0.55 + 0.45 * aRand.w) * (0.86 + 0.14 * sin(t * 1.8 + aRand.x * 12.0)) * mix(0.3, 1.0, p);
 }

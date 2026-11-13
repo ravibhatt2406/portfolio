@@ -41,3 +41,93 @@ Actual screenshots captured from the live application at 1600×1000:
 2. **Slight Three-Quarter View (12°)**: [recovery_02_slight_three_quarter.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/recovery_02_slight_three_quarter.png) — Subtle 3D perspective revealing nose bridge projection and cheek curvature without distortion.
 3. **Side View (20°)**: [recovery_03_side_view.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/recovery_03_side_view.png) — Stable profile within safe rotation arc, maintaining full facial integrity.
 4. **Full Desktop Composition**: [recovery_04_desktop_composition.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/recovery_04_desktop_composition.png) — Prominent, balanced hologram in right field; `"I AM RAVI."` hero typography is completely visible with ample margin; zero overlap with dock or desktop icons.
+
+---
+
+# RAVI.OS — Phase 21: Dual Particle Animation System
+
+## 1. Architecture Overview
+
+Phase 21 implements **two independent particle systems running simultaneously in 3D space**, each with dedicated geometry, animation shaders, displacement constraints, and interaction logic:
+
+```
+                             Three.js Scene Group
+                                      │
+              ┌───────────────────────┴───────────────────────┐
+              ▼                                               ▼
+┌───────────────────────────┐                   ┌───────────────────────────┐
+│ Internal Hologram System  │                   │ External Ambient System   │
+├───────────────────────────┤                   ├───────────────────────────┤
+│ • Photo-sampled Ravi bust │                   │ • ~1,500 ambient points   │
+│ • 45,000-60,000 particles │                   │ • Orbital & curved drift  │
+│ • Living flowing energy   │                   │ • Strict face exclusion   │
+│ • aProtect attribute      │                   │ • Fluid cursor trail      │
+│ • Core face disp: ≤0.002  │                   │ • Cyan, Blue, Violet      │
+│ • Eyes/nose/mouth intact  │                   │ • Independent shaders     │
+└───────────────────────────┘                   └───────────────────────────┘
+```
+
+---
+
+## 2. System 1: Internal Hologram Living Energy Projection
+
+- **Organic Fluid Motion**: Continuous harmonic oscillation across the surface (`sin(t * 1.5 + pos.y * 3.8 + pos.x * 2.2)`). Neighboring particles oscillate coherently together.
+- **Anatomical Feature Protection (`aProtect`)**:
+  - `1.0` on facial identity landmarks (eyes, eyebrows, nose bridge, nostrils, lips, mouth, moustache, beard, jawline, chin).
+  - `0.85` on neck column.
+  - `0.0` on outer hair crest and shoulder perimeter.
+- **Displacement Bounds**:
+  - Core facial features: Microscopic displacement ($\le 0.002$), keeping eyes, nose, and lips completely stable and recognizable.
+  - Peripheral hair and shoulders: Controlled organic wave ($\le 0.015$).
+- **Luminance Shimmer**: Dynamic micro-variations in particle brightness create the appearance of a living energy field without flickering.
+- **Cursor Micro-Interaction**: Soft repulsion away from the cursor strictly bounded by `mix(0.015, 0.002, aProtect)`. Zero facial distortion, zero holes, zero tearing.
+
+---
+
+## 3. System 2: External Ambient Particle System
+
+- **Spatial Distribution**:
+  - Generated dynamically around the holographic bust: above head, left/right ears, outer shoulders, and surrounding 3D space.
+  - **Strict Face Silhouette Exclusion Zone**: Any procedural particle within the face volume (`(x/0.38)^2 + ((y-0.12)/0.48)^2 < 1.0 && |z| < 0.40`) is discarded. The central facial silhouette remains 100% unobstructed.
+- **Motion Dynamics**:
+  - Gentle 3D helical and curved trajectories (`atan(z, x) + orbital velocity`).
+  - Soft vertical floating oscillation with natural phase offsets.
+- **Independent Cursor Response**:
+  - External ambient particles respond fluidly with soft deflection and flowing trail (deflection up to $0.080$).
+- **Color Palette**:
+  - Electric Cyan (`#00E5FF`): ~50%
+  - Deep Blue (`#0B84FF`): ~32%
+  - Violet Accent (`#8A2BE2`): ~18%
+
+---
+
+## 4. Rendered Verification Suite (Phase 21)
+
+All 6 required previews rendered and captured at 1600×1000:
+
+1. **Internal Hologram Particles Only (Moving, No Cursor)**:
+   [phase21_01_internal_only.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/phase21_01_internal_only.png)
+   - Complete facial resemblance and anatomical landmark clarity.
+   - Eyes, eyebrows, nose, mouth, beard, hairline, and shoulders intact.
+
+2. **External Ambient Particles Only (Floating, Face Clear)**:
+   [phase21_02_external_only.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/phase21_02_external_only.png)
+   - Shows the ambient particle cloud floating in 3D space around the bust.
+   - Central face area is strictly excluded and visually clear.
+
+3. **Both Particle Systems Running Simultaneously**:
+   [phase21_03_dual_simultaneous.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/phase21_03_dual_simultaneous.png)
+   - Seamless visual integration of the internal energy bust and external floating particles.
+
+4. **Cursor Interaction on Internal Hologram**:
+   [phase21_04_cursor_internal.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/phase21_04_cursor_internal.png)
+   - Cursor hovering over the bust causes zero facial tearing, no holes, and no particle explosion.
+   - Facial core remains solid; outer edges show subtle controlled micro-deflection.
+
+5. **Cursor Interaction on External Particles**:
+   [phase21_05_cursor_external.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/phase21_05_cursor_external.png)
+   - Demonstrates fluid deflection and flowing trail as the cursor passes through ambient particles.
+
+6. **Complete Hologram in Idle State (Desktop Environment)**:
+   [phase21_06_complete_idle_desktop.png](file:///C:/Users/User/.gemini/antigravity/brain/6dc40571-da28-405e-bf16-f28a75bbc250/phase21_06_complete_idle_desktop.png)
+   - Harmonious desktop composition with full sidebar, `"I AM RAVI."` hero typography, dock, and desktop icons completely unobscured.
